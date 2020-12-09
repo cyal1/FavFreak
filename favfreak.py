@@ -9,6 +9,7 @@ import ssl
 import argparse
 import os
 import errno
+import requests
 from os import path
 
 
@@ -43,7 +44,7 @@ def main():
     results = ThreadPool(20).imap_unordered(fetch_url, urls)
     for url, hash, error in results:
         if error is None:
-            print("\u001b[32m[INFO]\u001b[0mFetched %r" % ( url[:-12]))
+            print("\u001b[32m[INFO]\u001b[0m Fetched %r" % ( url[:-12]))
         else:
             print("\u001b[31m[ERR]\u001b[0m Not Fetched %r " % (url[:-12]))
     print("\n")
@@ -66,7 +67,8 @@ def main():
 if __name__ == "__main__":
     try:
         parser = argparse.ArgumentParser(description='FavFreak - a Favicon Hash based asset mapper')
-        parser.add_argument('-o','--output' , help = 'Output file name')
+        parser.add_argument('-o','--output', help = 'Output file name')
+        parser.add_argument('-u', '--url', help='The favicon url')
         parser.add_argument('--shodan' , help = 'Prints Shodan Dorks', action='store_true')
         args = parser.parse_args()
         if os.name == 'nt':
@@ -82,12 +84,30 @@ if __name__ == "__main__":
            \u001b[0m 
         """
         print(banner)
-        a,urls= main()
+        if args.url:
+            try:
+                response = requests.get(args.url, verify=False)
+            except Exception as e:
+                print("\u001b[31m[ERR]\u001b[0m Not Fetched %r " % (args.url))
+                sys.exit()
+            favicon = codecs.encode(response.content, 'base64')
+            hash = mmh3.hash(favicon)
+            a,urls= {hash: args.url},[args.url]
+            # print(a,urls)
+            print("\u001b[32m[INFO]\u001b[0m Fetched %r" % (args.url))
+            print("\n")
+            print("-------------------------------------------------------------------")
+            print("\u001b[32m[Favicon Hash Results] - \u001b[0m\n")
+            if len(args.url) > 1:
+                print("\u001b[33m[Hash]\u001b[0m " + "\u001b[32;1m" + str(hash) + "\u001b[0m")
+                print("     " + args.url[0][:-12])
+        else:
+            a,urls= main()
+            # print(a,urls)
 
         # add your fingerprints here :
         
         fingerprint = {
-
             99395752:"slack-instance",
             116323821:"spring-boot",
             81586312:"Jenkins",
@@ -590,21 +610,26 @@ if __name__ == "__main__":
             -1252041730:"Vue.js"
 
             }
-
-
-
-
+        # print(args.hash)
 
         print("\n")
         print("-------------------------------------------------------------------")
         print("\u001b[32m[FingerPrint Based Detection Results] - \u001b[0m\n")
-        for i in a.keys():
-            if i in fingerprint.keys():
-                print("\u001b[31m["+fingerprint[i]+"] \u001b[0m" + str(i) + " - count : " + str(len(a[i])))
-               # print('\n'.join(a[i][:-12]))
-                if len(a[i]) > 0:
-                    for k in a[i]:
-                        print("     " + k[:-12])
+        if args.url:
+            if hash in fingerprint.keys():
+                print("\u001b[31m[" + fingerprint[hash] + "] \u001b[0m" + str(hash) + " - count : 1" )
+                # print('\n'.join(a[i][:-12]))
+                if len(a[hash]) > 0:
+                        print("     " + a[hash])
+        else:
+            for i in a.keys():
+                if i in fingerprint.keys():
+                    print("\u001b[31m["+fingerprint[i]+"] \u001b[0m" + str(i) + " - count : " + str(len(a[i])))
+                   # print('\n'.join(a[i][:-12]))
+                    if len(a[i]) > 0:
+                        for k in a[i]:
+                            pass
+                            print("     " + k[:-12])
         
                 
 
@@ -634,8 +659,11 @@ if __name__ == "__main__":
         print("-------------------------------------------------------------------")
         print("\u001b[32m[Summary]\u001b[0m\n")
         print(" \u001b[36mcount      \u001b[35mHash\u001b[0m         ")
-        for i in a.keys():
-            print(f"~ \u001b[36m[{len(a[i])}]  : \u001b[35m[{i}]\u001b[0m ")
+        if args.url:
+            print(f"~ \u001b[36m[1]  : \u001b[35m[{hash}]\u001b[0m ")
+        else:
+            for i in a.keys():
+                print(f"~ \u001b[36m[{len(a[i])}]  : \u001b[35m[{i}]\u001b[0m ")
         if args.output:
             print(f"\n\u001b[32m[+] Output saved here : {args.output}\u001b[0m")
     except KeyboardInterrupt:
